@@ -34,6 +34,9 @@ export interface AotPluginOptions {
   // Use tsconfig to include path globs.
   exclude?: string | string[];
   compilerOptions?: ts.CompilerOptions;
+  readFileTransformer?: (fileName: string, source: string) => string;
+  resourcePathTransformer?: (fileName: string) => string;
+  resourceTransformer?: (fileName: string, source: string) => string | Promise<string>;
 }
 
 
@@ -49,6 +52,9 @@ export class AotPlugin implements Tapable {
   private _rootFilePath: string[];
   private _compilerHost: WebpackCompilerHost;
   private _resourceLoader: WebpackResourceLoader;
+  private _readFileTransformer: (fileName: string, source: string) => string;
+  private _resourcePathTransformer: (fileName: string) => string;
+  private _resourceTransformer: (fileName: string, source: string) => string | Promise<string>;
   private _lazyRoutes: LazyRouteMap = Object.create(null);
   private _tsConfigPath: string;
   private _entryModule: string;
@@ -185,7 +191,19 @@ export class AotPlugin implements Tapable {
       this._skipCodeGeneration = options.skipCodeGeneration;
     }
 
-    this._compilerHost = new WebpackCompilerHost(this._compilerOptions, this._basePath);
+    if (options.hasOwnProperty('resourcePathTransformer')) {
+      this._resourcePathTransformer = options.resourcePathTransformer;
+    }
+    if (options.hasOwnProperty('resourceTransformer')) {
+      this._resourceTransformer = options.resourceTransformer;
+    }
+
+    if (options.hasOwnProperty('readFileTransformer')) {
+      this._readFileTransformer = options.readFileTransformer;
+    }
+    this._compilerHost = new WebpackCompilerHost(this._compilerOptions,
+                                                 this._basePath,
+                                                 this._readFileTransformer);
 
     // Override some files in the FileSystem.
     if (options.hasOwnProperty('hostOverrideFileSystem')) {
@@ -442,7 +460,28 @@ export class AotPlugin implements Tapable {
           i18nFormat: this.i18nFormat,
           locale: this.locale,
 
-          readResource: (path: string) => this._resourceLoader.get(path)
+          readResource: (path: string) => {
+
+            const newPath = this._resourcePathTransformer instanceof Function
+                              ? this._resourcePathTransformer(path)
+                              : path;
+
+            if (newPath === '') {
+              return Promise.resolve(newPath);
+            } else if (!this._compilerHost.fileExists(newPath)) {
+              throw new Error(`Compilation failed. Resource file not found: ${newPath}`);
+            } else {
+              return this._resourceLoader.get(newPath)
+                .then(source => {
+                  if (this._resourceTransformer instanceof Function) {
+                    return this._resourceTransformer(newPath, source);
+                  } else {
+                    return source;
+                  }
+                });
+            }
+
+          }
         });
       })
       .then(() => {

@@ -2,7 +2,6 @@ import * as ts from 'typescript';
 import {basename, dirname, join} from 'path';
 import * as fs from 'fs';
 
-
 export interface OnErrorFn {
   (message: string): void;
 }
@@ -104,10 +103,21 @@ export class WebpackCompilerHost implements ts.CompilerHost {
 
   private _cache = false;
 
-  constructor(private _options: ts.CompilerOptions, basePath: string) {
+  constructor(private _options: ts.CompilerOptions,
+                 basePath: string,
+                 private _readFileTransformer?: (fileName: string, source: string) => string) {
     this._setParentNodes = true;
     this._delegate = ts.createCompilerHost(this._options, this._setParentNodes);
     this._basePath = this._normalizePath(basePath);
+  }
+
+  private _readFile(fileName: string) {
+      const result = this._delegate.readFile(fileName);
+      if (result !== undefined && this._readFileTransformer instanceof Function) {
+        return this._readFileTransformer(fileName, result);
+      } else {
+        return result;
+      }
   }
 
   private _normalizePath(path: string) {
@@ -202,7 +212,7 @@ export class WebpackCompilerHost implements ts.CompilerHost {
   readFile(fileName: string): string {
     fileName = this._resolve(fileName);
     if (this._files[fileName] == null) {
-      const result = this._delegate.readFile(fileName);
+      const result = this._readFile(fileName);
       if (result !== undefined && this._cache) {
         this._setFileContent(fileName, result);
         return result;
