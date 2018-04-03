@@ -48,7 +48,7 @@
     "file-loader": "^1.1.9",
     "fs-extra": "^4.0.0",
     "glob": "^7.0.3",
-    "html-webpack-plugin": "github:webpack-contrib/html-webpack-plugin#a8a8c2b6ea496c257fd6f501db3a06a51fa03e1e",
+    "html-webpack-plugin": "github:jantimon/html-webpack-plugin#a8a8c2b6ea496c257fd6f501db3a06a51fa03e1e",
     "karma-source-map-support": "^1.2.0",
     "less": "^2.7.2",
     "less-loader": "^4.0.5",
